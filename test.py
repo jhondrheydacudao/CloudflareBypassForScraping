@@ -91,4 +91,4 @@ def main():
             display.stop()
 
 if __name__ == '__main__':
-    main()
+    app.run(debug=False, host="0.0.0.0", port=400)
