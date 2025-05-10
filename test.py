@@ -1,10 +1,8 @@
 import time
 import logging
 import os
-from flask import Flask, request, jsonify
 from CloudflareBypasser import CloudflareBypasser
 from DrissionPage import ChromiumPage, ChromiumOptions
-from pyvirtualdisplay import Display
 
 # Configure logging
 logging.basicConfig(
@@ -15,8 +13,6 @@ logging.basicConfig(
         logging.FileHandler('cloudflare_bypass.log', mode='w')
     ]
 )
-
-app = Flask(__name__)
 
 def get_chromium_options(browser_path: str, arguments: list) -> ChromiumOptions:
     """
@@ -32,21 +28,21 @@ def get_chromium_options(browser_path: str, arguments: list) -> ChromiumOptions:
         options.set_argument(argument)
     return options
 
-@app.route('/bypass', methods=['GET'])
-def bypass_cloudflare():
-    url = request.args.get('url')
-    if not url:
-        return jsonify({"error": "URL parameter is required!"}), 400
-
-    logging.info(f"🌐 Received request to bypass Cloudflare for URL: {url}")
-
+def main():
+    # Chromium Browser Path
     isHeadless = os.getenv('HEADLESS', 'false').lower() == 'true'
+    
     if isHeadless:
+        from pyvirtualdisplay import Display
+
         display = Display(visible=0, size=(1920, 1080))
         display.start()
 
     browser_path = os.getenv('CHROME_PATH', "/usr/bin/google-chrome")
     
+    # Windows Example
+    # browser_path = os.getenv('CHROME_PATH', r"C:/Program Files/Google/Chrome/Application/chrome.exe")
+
     # Arguments to make the browser better for automation and less detectable.
     arguments = [
         "-no-first-run",
@@ -63,40 +59,31 @@ def bypass_cloudflare():
         "-disable-gpu",
         "-accept-lang=en-US",
     ]
-    
+
     options = get_chromium_options(browser_path, arguments)
 
     # Initialize the browser
     driver = ChromiumPage(addr_or_opts=options)
-    
     try:
-        logging.info('Navigating to the provided URL.')
-        driver.get(url)
+        logging.info('Navigating to the demo page.')
+        driver.get('https://nopecha.com/demo/cloudflare')
 
+        # Where the bypass starts
         logging.info('Starting Cloudflare bypass.')
         cf_bypasser = CloudflareBypasser(driver)
 
-        # Bypass the Cloudflare page
+        # If you are solving an in-page captcha (like the one here: https://seleniumbase.io/apps/turnstile), use cf_bypasser.click_verification_button() directly instead of cf_bypasser.bypass().
+        # It will automatically locate the button and click it. Do your own check if needed.
+
         cf_bypasser.bypass()
 
-        logging.info("Bypass successful!")
-        logging.info(f"Title of the page: {driver.title}")
+        logging.info("Enjoy the content!")
+        logging.info("Title of the page: %s", driver.title)
 
-        # Sleep to let the user see the result
-        time.sleep(3)
-
-        # Returning the final URL
-        final_url = driver.current_url
-        return jsonify({
-            "message": "Cloudflare bypass successful!",
-            "bypassed_url": final_url,
-            "title": driver.title
-        })
-
+        # Sleep for a while to let the user see the result if needed
+        time.sleep(5)
     except Exception as e:
-        logging.error(f"An error occurred: {e}")
-        return jsonify({"error": str(e)}), 500
-
+        logging.error("An error occurred: %s", str(e))
     finally:
         logging.info('Closing the browser.')
         driver.quit()
@@ -104,4 +91,4 @@ def bypass_cloudflare():
             display.stop()
 
 if __name__ == '__main__':
-    app.run(debug=False, host="0.0.0.0", port=400)
+    main()
